@@ -5,11 +5,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { readFile, writeFile } from "fs/promises";
-import { v4 as uuid } from "uuid";
-import { connectDatabase } from "./utils/database";
+import { connectDatabase, getTodoCollection } from "./utils/database.js";
 
 if (!process.env.MONGODB_URI) {
-	throw new Error("No MONGODB_URI available in dotenv");
+	throw new Error("No MONGODB_URI availabl in dotenv");
 }
 
 const app = express();
@@ -36,19 +35,18 @@ app.get("/api/todos", async (request, response, next) => {
 
 app.post("/api/todos", async (request, response, next) => {
 	try {
-		const data = await readFile(DATABASE_URI, "utf8");
-		const json = JSON.parse(data);
+		const collection = getTodoCollection();
 
 		const todo = {
 			...request.body,
 			isChecked: false,
-			id: uuid(),
 		};
 
-		json.todos.push(todo);
-		await writeFile(DATABASE_URI, JSON.stringify(json, null, 4));
-		response.status(201);
-		response.json(todo);
+		const mongoDbResponse = await collection.insertOne(todo);
+
+		response
+			.status(201)
+			.send(`Insertion successful, document id:${mongoDbResponse.insertedId}`);
 	} catch (error_) {
 		next(error_);
 	}
@@ -94,9 +92,6 @@ app.put("/api/todos", async (request, response, next) => {
 		// Send a 200
 		response.status(200);
 		response.send(json.todos[index]);
-		// Or 204 (No Content)
-		// response.status(204);
-		// response.send();
 	} catch (error_) {
 		next(error_);
 	}
@@ -104,6 +99,6 @@ app.put("/api/todos", async (request, response, next) => {
 
 connectDatabase(process.env.MONGODB_URI).then(() => {
 	app.listen(port, () => {
-		console.log(`Serverlistening on port ${port}`);
+		console.log(`Server listening on port ${port} `);
 	});
 });
